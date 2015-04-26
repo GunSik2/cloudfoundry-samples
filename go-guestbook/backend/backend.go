@@ -8,6 +8,7 @@ import (
 	"github.com/JamesClonk/vcap"
 	"github.com/codegangsta/negroni"
 	"github.com/gorilla/mux"
+	"github.com/unrolled/render"
 )
 
 var (
@@ -26,10 +27,41 @@ func init() {
 func main() {
 	backendRegistration()
 
+	r := render.New()
 	router := mux.NewRouter()
+
 	router.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		fmt.Fprintf(w, "Welcome to the Cloud Foundry go-guestbook sample app backend!")
 	})
+
+	router.HandleFunc("/entries", func(w http.ResponseWriter, req *http.Request) {
+		entries, err := getEntries()
+		if err != nil {
+			fmt.Fprintf(w, "ERROR getEntries: %v", err)
+			return
+		}
+		r.JSON(w, http.StatusOK, entries)
+	}).Methods("GET")
+
+	router.HandleFunc("/entry", func(w http.ResponseWriter, req *http.Request) {
+		text := req.URL.Query().Get("text")
+		if text != "" {
+			insertEntry(text)
+		}
+	}).Methods("GET")
+
+	router.HandleFunc("/entry", func(w http.ResponseWriter, req *http.Request) {
+		err := req.ParseForm()
+		if err != nil {
+			fmt.Fprintf(w, "ERROR ParseForm: %v", err)
+			return
+		}
+
+		text := req.FormValue("text")
+		if text != "" {
+			insertEntry(text)
+		}
+	}).Methods("POST")
 
 	n := negroni.Classic()
 	n.UseHandler(router)

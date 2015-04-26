@@ -12,7 +12,7 @@ buildpack: https://github.com/cloudfoundry/buildpack-go.git
 applications:
 - name: go-guestbook-frontend
   memory: 16M
-  instances: 3
+  instances: 4
   host: go-guestbook
   path: ./frontend/
   command: frontend
@@ -21,7 +21,7 @@ applications:
 
 - name: go-guestbook-backend
   memory: 32M
-  instances: 2
+  instances: 3
   no-route: true
   host: go-guestbook-backend
   path: ./backend/
