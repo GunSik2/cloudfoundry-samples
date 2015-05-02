@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"net/http"
 
 	"github.com/garyburd/redigo/redis"
 )
@@ -20,23 +19,13 @@ func getRedisConnection() (redis.Conn, error) {
 		return nil, errors.New(fmt.Sprintf("Cannot connect to Redis[%v]: %v", address, err))
 	}
 
+	// login to redis with credentials
 	if _, err := conn.Do("AUTH", fmt.Sprintf("%v", service.Credentials["password"])); err != nil {
 		conn.Close()
 		return nil, errors.New(fmt.Sprintf("Redis authentication error: %v", err))
 	}
 
 	return conn, nil
-}
-
-type HitCounter struct{}
-
-func (h *HitCounter) ServeHTTP(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	err := increaseHitCounter()
-	if err != nil {
-		fmt.Fprintf(w, "Redis error: %v", err)
-		return
-	}
-	next(w, r)
 }
 
 func increaseHitCounter() error {
@@ -74,43 +63,43 @@ func discoverBackends() ([]string, error) {
 	}
 	defer c.Close()
 
-	exists, err := redis.Bool(c.Do("EXISTS", "go-guestbook-backends"))
+	// check if main set exists, if not return an empty list of backends
+	exists, err := redis.Bool(c.Do("EXISTS", redisBackendSet))
 	if err != nil {
 		return nil, err
-	}
-	if !exists {
+	} else if !exists {
 		return nil, nil
 	}
 
+	// get all enries from main set
 	var backends []string
-	reply, err := redis.Strings(c.Do("SMEMBERS", "go-guestbook-backends"))
+	entries, err := redis.Strings(c.Do("SMEMBERS", redisBackendSet))
 	if err != nil {
 		return backends, err
 	}
 
-	for _, r := range reply {
-		exists, err := redis.Bool(c.Do(
-			"EXISTS",
-			fmt.Sprintf("go-guestbook-backend-%v", r)))
+	// go through all entries of main set
+	for _, entry := range entries {
+		exists, err := redis.Bool(c.Do("EXISTS", entry))
 		if err != nil {
 			return backends, err
 		}
 
 		if !exists {
-			_, err := c.Do("SREM", "go-guestbook-backends", r)
+			// if VCAP_APPLICATION.instance_id does not exists as key (because TTL expired)
+			// then remove the entry from main set
+			_, err := c.Do("SREM", redisBackendSet, entry)
 			if err != nil {
 				return backends, err
 			}
 		} else {
-			backend, err := redis.String(c.Do(
-				"GET",
-				fmt.Sprintf("go-guestbook-backend-%v", r)))
+			// get value of VCAP_APPLICATION.instance_id key, and add to list of available backends
+			backend, err := redis.String(c.Do("GET", entry))
 			if err != nil {
 				return backends, err
 			}
 			backends = append(backends, backend)
 		}
 	}
-
 	return backends, nil
 }

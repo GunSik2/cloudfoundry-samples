@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 )
 
 type Entry struct {
@@ -14,7 +13,7 @@ type Entry struct {
 }
 
 func getMongoDB() (*mgo.Database, error) {
-	service := env.GetService("mongodb-go-guestbook")
+	service := env.GetService(mongoDbServiceInstance)
 	session, err := mgo.Dial(fmt.Sprintf("%v", service.Credentials["url"]))
 	if err != nil {
 		return nil, err
@@ -50,7 +49,7 @@ func getEntries() ([]Entry, error) {
 
 	var result []Entry
 	e := db.C("entries")
-	if err := e.Find(bson.Undefined).All(&result); err != nil {
+	if err := e.Find(nil).Sort("-timestamp").All(&result); err != nil {
 		return nil, err
 	}
 	return result, nil

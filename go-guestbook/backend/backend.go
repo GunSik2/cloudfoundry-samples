@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -11,65 +12,80 @@ import (
 	"github.com/unrolled/render"
 )
 
-var (
-	redisServiceInstance = "redis-go-guestbook"
-	env                  *vcap.VCAP
+const (
+	redisServiceInstance   = "redis-go-guestbook"
+	redisBackendSet        = "go-guestbook-backends"
+	mongoDbServiceInstance = "mongodb-go-guestbook"
 )
 
+var env *vcap.VCAP
+
 func init() {
+	// parse cloudfoundry VCAP_* env data
 	var err error
 	env, err = vcap.New()
 	if err != nil {
-		fmt.Printf("ERROR: %v", err)
+		log.Fatalf("ERROR: %v\n", err)
 	}
 }
 
 func main() {
+	// start goroutine that continually registers this backend instance on redis for service discovery
 	backendRegistration()
 
-	r := render.New()
-	router := mux.NewRouter()
-
-	router.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
-		fmt.Fprintf(w, "Welcome to the Cloud Foundry go-guestbook sample app backend!")
+	// create render instance
+	r := render.New(render.Options{
+		IndentJSON: true,
 	})
 
-	router.HandleFunc("/entries", func(w http.ResponseWriter, req *http.Request) {
-		entries, err := getEntries()
-		if err != nil {
-			fmt.Fprintf(w, "ERROR getEntries: %v", err)
-			return
-		}
-		r.JSON(w, http.StatusOK, entries)
-	}).Methods("GET")
+	// setup routes
+	router := mux.NewRouter()
+	router.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+		r.JSON(w, http.StatusOK, "Welcome to the Cloud Foundry go-guestbook sample app backend!")
+	})
+	router.HandleFunc("/entries", getEntriesHandler(r)).Methods("GET")
+	router.HandleFunc("/entry", postEntryHandler(r)).Methods("POST")
 
-	router.HandleFunc("/entry", func(w http.ResponseWriter, req *http.Request) {
-		text := req.URL.Query().Get("text")
-		if text != "" {
-			insertEntry(text)
-		}
-	}).Methods("GET")
-
-	router.HandleFunc("/entry", func(w http.ResponseWriter, req *http.Request) {
-		err := req.ParseForm()
-		if err != nil {
-			fmt.Fprintf(w, "ERROR ParseForm: %v", err)
-			return
-		}
-
-		text := req.FormValue("text")
-		if text != "" {
-			insertEntry(text)
-		}
-	}).Methods("POST")
-
+	// setup negroni
 	n := negroni.Classic()
 	n.UseHandler(router)
 	n.Run(fmt.Sprintf(":%d", env.Port))
 }
 
+func getEntriesHandler(r *render.Render) func(w http.ResponseWriter, req *http.Request) {
+	return func(w http.ResponseWriter, req *http.Request) {
+		entries, err := getEntries()
+		if err != nil {
+			r.JSON(w, http.StatusInternalServerError, err)
+			return
+		}
+		r.JSON(w, http.StatusOK, entries)
+	}
+}
+
+func postEntryHandler(r *render.Render) func(w http.ResponseWriter, req *http.Request) {
+	return func(w http.ResponseWriter, req *http.Request) {
+		err := req.ParseForm()
+		if err != nil {
+			r.JSON(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		text := req.FormValue("text")
+		if text == "" {
+			r.JSON(w, http.StatusExpectationFailed, "No text provided")
+		}
+
+		if err := insertEntry(text); err != nil {
+			r.JSON(w, http.StatusInternalServerError, err)
+			return
+		}
+		r.JSON(w, http.StatusCreated, nil)
+	}
+}
+
 func backendRegistration() {
-	ticker := time.NewTicker(time.Second * 10)
+	ticker := time.NewTicker(time.Second * 5)
 	go func() {
 		for range ticker.C {
 			registerBackend()

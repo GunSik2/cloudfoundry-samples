@@ -19,6 +19,7 @@ func getRedisConnection() (redis.Conn, error) {
 		return nil, errors.New(fmt.Sprintf("Cannot connect to Redis[%v]: %v", address, err))
 	}
 
+	// login to redis with credentials
 	if _, err := conn.Do("AUTH", fmt.Sprintf("%v", service.Credentials["password"])); err != nil {
 		conn.Close()
 		return nil, errors.New(fmt.Sprintf("Redis authentication error: %v", err))
@@ -34,16 +35,14 @@ func registerBackend() error {
 	}
 	defer c.Close()
 
-	_, err = c.Do(
-		"SETEX",
-		fmt.Sprintf("go-guestbook-backend-%v", env.Application.InstanceID),
-		"30",
-		env.InstanceAddress)
+	// add VCAP_APPLICATION.instance_id as key with a 15s TTL to redis for service discovery
+	_, err = c.Do("SETEX", env.Application.InstanceID, "15", env.InstanceAddress)
 	if err != nil {
 		return err
 	}
 
-	_, err = c.Do("SADD", "go-guestbook-backends", env.Application.InstanceID)
+	// add VCAP_APPLICATION.instance_id to main set
+	_, err = c.Do("SADD", redisBackendSet, env.Application.InstanceID)
 	if err != nil {
 		return err
 	}

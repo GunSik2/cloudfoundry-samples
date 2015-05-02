@@ -26,6 +26,10 @@
 		{
 			"ImportPath": "github.com/gorilla/mux",
 			"Rev": "660d31f8602b95058fed6833debf113e85350868"
+		},
+		{
+			"ImportPath": "github.com/unrolled/render",
+			"Rev": "83f2ba57c12cec399ef137457b1957e41ef0bbe8"
 		}
 	]
 }
