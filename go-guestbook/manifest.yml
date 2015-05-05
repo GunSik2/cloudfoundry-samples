@@ -6,7 +6,7 @@
 
 # all applications use these settings and services
 domain: nova.scapp.io
-disk: 64M
+disk_quota: 64M
 buildpack: https://github.com/cloudfoundry/buildpack-go.git
 
 applications:
