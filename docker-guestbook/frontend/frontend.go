@@ -173,7 +173,7 @@ func getEntriesFromBackend() ([]Entry, error) {
 		return nil, err
 	}
 
-	if strings.Trim(string(body), `\n\r\t `) == "{}" {
+	if strings.Contains(strings.Trim(string(body), "\n\r\t "), "{}") {
 		return nil, nil
 	}
 
