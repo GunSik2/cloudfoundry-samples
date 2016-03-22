@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/JamesClonk/vcap"
@@ -172,9 +173,13 @@ func getEntriesFromBackend() ([]Entry, error) {
 		return nil, err
 	}
 
+	if strings.Trim(string(body), `\n\r\t `) == "{}" {
+		return nil, nil
+	}
+
 	var entries []Entry
 	if err := json.Unmarshal(body, &entries); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%v: \n[%v]", err.Error(), string(body))
 	}
 	return entries, nil
 }

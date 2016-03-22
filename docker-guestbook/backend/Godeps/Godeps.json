@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/JamesClonk/cloudfoundry-samples/go-guestbook/backend",
-	"GoVersion": "go1.4.1",
+	"GoVersion": "go1.4.3",
 	"Deps": [
 		{
 			"ImportPath": "github.com/JamesClonk/vcap",
