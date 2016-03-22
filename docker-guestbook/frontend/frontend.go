@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/JamesClonk/vcap"
@@ -179,6 +180,6 @@ func getEntriesFromBackend() ([]Entry, error) {
 }
 
 func getBackendURL() (string, error) {
-	endpoint := os.GetEnv("BACKEND_ENDPOINT")
+	endpoint := os.Getenv("BACKEND_ENDPOINT")
 	return fmt.Sprintf("http://%s", endpoint), nil
 }
